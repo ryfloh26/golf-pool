@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+{% block title %}{{ tournament.name }} - Golf Pool{% endblock %}
+{% block extra_head %}
+<style>
+    .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+    .status-dot.live { background: #00ff88; animation: pulse 2s infinite; }
+    .status-dot.post { background: #ffd700; }
+    .status-dot.pre { background: #aaa; }
+    .golfer-live { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #00ff88; margin-right: 4px; animation: pulse 2s infinite; vertical-align: middle; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .last-updated { font-size: 0.8em; color: #aaa; }
+
+    /* Spreadsheet-style table */
+    .pool-grid {
+        font-size: 0.82em;
+        border-collapse: collapse;
+        white-space: nowrap;
+    }
+    .pool-grid th, .pool-grid td {
+        padding: 4px 8px;
+        border: 1px solid #dee2e6;
+        vertical-align: middle;
+    }
+    .pool-grid .member-header {
+        background: #2d5a3d;
+        color: #fff;
+        text-align: center;
+        font-weight: bold;
+        font-size: 0.95em;
+    }
+    .pool-grid .col-name { min-width: 120px; }
+    .pool-grid .col-score { min-width: 50px; text-align: center; }
+    .pool-grid .round-label {
+        background: #1a472a;
+        color: #ffd700;
+        font-weight: bold;
+        font-size: 0.95em;
+    }
+    .pool-grid .total-row {
+        background: #e8f5e9;
+        font-weight: bold;
+    }
+    .pool-grid .total-row td { border-top: 2px solid #2d5a3d; }
+    .pool-grid .final-row {
+        background: #ffd700;
+        color: #333;
+        font-weight: bold;
+        font-size: 1em;
+    }
+    .pool-grid .final-row td { border-top: 3px solid #333; }
+    .pool-grid .placement-row { background: #fff3cd; }
+    .pool-grid .placement-row td { font-weight: bold; text-align: center; font-size: 0.95em; }
+    .pool-grid .mc { color: #dc3545; font-weight: bold; }
+    .pool-grid .used-score { color: #dc3545; font-weight: bold; }
+    .pool-grid .first-place { background: #ffd700; color: #333; }
+    .pool-grid .second-place { background: #e0e0e0; color: #333; }
+    .pool-grid .third-place { background: #f0d0a0; color: #333; }
+    .pool-grid .fourth-place { background: #d4edda; color: #333; }
+    .pool-grid .low-round { background: #e8daef; color: #6c3483; }
+    .pool-grid .name-footer {
+        background: #2d5a3d;
+        color: #fff;
+        text-align: center;
+        font-weight: bold;
+    }
+
+    .card-grid { background: #fff; overflow-x: auto; }
+
+    /* Leaderboard payout badges */
+    .payout-badge { font-size: 0.75em; padding: 2px 6px; border-radius: 3px; margin-left: 4px; }
+    .payout-1st { background: #ffd700; color: #333; }
+    .payout-2nd { background: #c0c0c0; color: #333; }
+    .payout-3rd { background: #cd7f32; color: #fff; }
+    .payout-4th { background: #28a745; color: #fff; }
+    .payout-lr { background: #6c3483; color: #fff; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1>{{ tournament.name }} {{ tournament.year }}</h1>
+        <div>
+            <span class="status-dot {% if tournament_status == 'in' %}live{% elif tournament_status == 'post' %}post{% else %}pre{% endif %}"></span>
+            <span id="status-text">
+                {% if tournament_status == 'in' %}LIVE{% elif tournament_status == 'post' %}FINAL{% else %}UPCOMING{% endif %}
+            </span>
+            <span class="last-updated" id="last-updated"></span>
+        </div>
+    </div>
+    <div>
+        <a href="{{ url_for('new_member', tid=tournament.id) }}" class="btn btn-masters btn-sm">+ Add Member</a>
+        <a href="{{ url_for('enter_picks', tid=tournament.id) }}" class="btn btn-masters btn-sm">Enter Picks</a>
+        <a href="{{ url_for('export_excel', tid=tournament.id) }}" class="btn btn-outline-light btn-sm">Export Excel</a>
+        <form method="POST" action="{{ url_for('sync_espn_scores', tid=tournament.id) }}" class="d-inline">
+            <button type="submit" class="btn btn-outline-light btn-sm">Sync ESPN</button>
+        </form>
+        <div class="btn-group ms-2">
+            {% for i in range(4) %}
+            <a href="{{ url_for('enter_scores', tid=tournament.id, round=i+1) }}" class="btn btn-outline-light btn-sm">
+                {{ round_names[i][:3] }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% if leaderboard %}
+<div class="card card-grid p-2">
+    <div class="table-responsive">
+        <table class="pool-grid">
+            {# --- Header row: member names --- #}
+            <thead>
+                <tr>
+                    <th></th>
+                    {% for entry in leaderboard_by_name %}
+                    <th colspan="2" class="member-header
+                        {%- if entry.placement == 1 %} first-place
+                        {%- elif entry.placement == 2 %} second-place
+                        {%- elif entry.placement == 3 %} third-place
+                        {%- elif entry.placement == 4 %} fourth-place
+                        {%- elif entry.low_round %} low-round{% endif %}">
+                        {{ entry.member.name }}
+                        {% if entry.placement == 1 %}&#x1f947;
+                        {% elif entry.placement == 2 %}&#x1f948;
+                        {% elif entry.placement == 3 %}&#x1f949;
+                        {% elif entry.placement == 4 %}4th
+                        {% elif entry.low_round %}LR{% endif %}
+                    </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {# --- Round blocks --- #}
+                {% for rnd_idx in range(4) %}
+                {# Round label row #}
+                <tr>
+                    <td class="round-label">{{ round_names[rnd_idx] }}</td>
+                    {% for entry in leaderboard_by_name %}
+                    <td class="round-label col-name"></td>
+                    <td class="round-label col-score">Score</td>
+                    {% endfor %}
+                </tr>
+                {# 6 golfer rows per round #}
+                {% for pick_idx in range(6) %}
+                <tr>
+                    <td></td>
+                    {% for entry in leaderboard_by_name %}
+                    {% if pick_idx < entry.golfers|length %}
+                        {% set g = entry.golfers[pick_idx] %}
+                        {% set rnd = rnd_idx + 1 %}
+                        {% set s = g.scores.get(rnd) %}
+                        {% set is_used = rnd in g.get('used_rounds', []) %}
+                        <td class="col-name">{% if g.thru and g.thru not in ['F', '--', ''] and tournament_status == 'in' %}<span class="golfer-live"></span>{% endif %}{{ g.name }}</td>
+                        <td class="col-score{% if is_used %} used-score{% endif %}">
+                            {% if s %}
+                                {% if s.is_mc %}<span class="mc">MC</span>
+                                {% elif s.score is not none %}{{ s.score }}
+                                {% else %}-{% endif %}
+                            {% else %}
+                                {% if g.missed_cut and rnd > 2 %}<span class="mc">MC</span>{% else %}-{% endif %}
+                            {% endif %}
+                        </td>
+                    {% else %}
+                        <td class="col-name">-</td>
+                        <td class="col-score">-</td>
+                    {% endif %}
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+                {# TOTAL row for this round #}
+                <tr class="total-row">
+                    <td>TOTAL</td>
+                    {% for entry in leaderboard_by_name %}
+                    <td></td>
+                    <td class="col-score">
+                        {% if entry.round_totals[rnd_idx] is not none %}
+                            {{ "%.2f"|format(entry.round_totals[rnd_idx]) }}
+                        {% else %}-{% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+
+                {# --- Placement row --- #}
+                <tr class="placement-row">
+                    <td></td>
+                    {% for entry in leaderboard_by_name %}
+                    <td colspan="2" class="
+                        {%- if entry.placement == 1 %} first-place
+                        {%- elif entry.placement == 2 %} second-place
+                        {%- elif entry.placement == 3 %} third-place
+                        {%- elif entry.placement == 4 %} fourth-place
+                        {%- elif entry.low_round %} low-round{% endif %}">
+                        {% if entry.placement == 1 %}1st
+                        {% elif entry.placement == 2 %}2nd
+                        {% elif entry.placement == 3 %}3rd
+                        {% elif entry.placement == 4 %}4th
+                        {% endif %}
+                        {% if entry.low_round %}LR{% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+
+                {# --- FINAL row --- #}
+                <tr class="final-row">
+                    <td>FINAL</td>
+                    {% for entry in leaderboard_by_name %}
+                    <td></td>
+                    <td class="col-score">
+                        {% if entry.final is not none %}
+                            {{ "%.2f"|format(entry.final) }}
+                        {% else %}-{% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+
+                {# --- Footer: names again --- #}
+                <tr>
+                    <td class="name-footer"></td>
+                    {% for entry in leaderboard_by_name %}
+                    <td colspan="2" class="name-footer
+                        {%- if entry.placement == 1 %} first-place
+                        {%- elif entry.placement == 2 %} second-place
+                        {%- elif entry.placement == 3 %} third-place
+                        {%- elif entry.placement == 4 %} fourth-place
+                        {%- elif entry.low_round %} low-round{% endif %}">
+                        {{ entry.member.name }}
+                    </td>
+                    {% endfor %}
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# --- Ranked Leaderboard summary --- #}
+<h3 class="mt-4 mb-3">Leaderboard</h3>
+<div class="card p-3">
+    {% if low_round_winner %}
+    <div class="mb-2" style="font-size:0.9em;">
+        <span class="payout-badge payout-lr">LOW ROUND</span>
+        <strong>{{ low_round_winner }}</strong> &mdash; {{ "%.2f"|format(low_round_value) }} ({{ round_names[low_round_rnd - 1] }})
+    </div>
+    {% endif %}
+    <table class="table table-hover mb-0" style="color:#333;">
+        <thead>
+            <tr style="background:#2d5a3d;color:#fff;">
+                <th>#</th>
+                <th>Name</th>
+                {% for rn in round_names %}
+                <th class="text-center">{{ rn[:3] }}</th>
+                {% endfor %}
+                <th class="text-center">Final</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for entry in leaderboard_ranked %}
+            <tr class="
+                {%- if entry.placement == 1 %} table-warning
+                {%- elif entry.placement == 2 %} table-secondary
+                {%- elif entry.placement == 3 %} table-info
+                {%- elif entry.placement == 4 %} table-success{% endif %}">
+                <td><strong>{{ loop.index }}</strong></td>
+                <td><strong>{% if entry.any_live and tournament_status == 'in' %}<span class="golfer-live"></span>{% endif %}{{ entry.member.name }}</strong></td>
+                {% for rt in entry.round_totals %}
+                <td class="text-center">{% if rt is not none %}{{ "%.2f"|format(rt) }}{% else %}-{% endif %}</td>
+                {% endfor %}
+                {% for i in range(4 - entry.round_totals|length) %}
+                <td class="text-center">-</td>
+                {% endfor %}
+                <td class="text-center"><strong>{% if entry.final is not none %}{{ "%.2f"|format(entry.final) }}{% else %}-{% endif %}</strong></td>
+                <td>
+                    {% if entry.placement == 1 %}<span class="payout-badge payout-1st">1st</span>
+                    {% elif entry.placement == 2 %}<span class="payout-badge payout-2nd">2nd</span>
+                    {% elif entry.placement == 3 %}<span class="payout-badge payout-3rd">3rd</span>
+                    {% elif entry.placement == 4 %}<span class="payout-badge payout-4th">4th</span>
+                    {% endif %}
+                    {% if entry.low_round %}<span class="payout-badge payout-lr">LR</span>{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% else %}
+<div class="card p-4 text-center">
+    <p class="mb-0">No pool members yet. Add members and enter their picks to get started.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TOURNAMENT_ID = {{ tournament.id }};
+const REFRESH_INTERVAL = 60000;
+const STATUS = '{{ tournament_status }}';
+
+function refreshLeaderboard() {
+    fetch('/api/live/' + TOURNAMENT_ID)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('last-updated').textContent = 'Updated ' + data.last_updated;
+            if (data.tournament_status === 'in') {
+                location.reload();
+            }
+        })
+        .catch(err => console.log('Refresh error:', err));
+}
+
+if (STATUS === 'in') {
+    setInterval(refreshLeaderboard, REFRESH_INTERVAL);
+    document.getElementById('last-updated').textContent = '(auto-refreshing every 60s)';
+}
+</script>
+{% endblock %}

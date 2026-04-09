@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Enter Picks - Golf Pool{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card p-4">
+            <h2>Enter Picks</h2>
+            <p class="text-muted">{{ tournament.name }} {{ tournament.year }} &mdash; Select 6 golfers for a pool member</p>
+
+            <form method="POST" id="picks-form">
+                <div class="mb-3">
+                    <label class="form-label">Pool Member</label>
+                    <select name="member_id" id="member-select" class="form-select" required onchange="loadPicks(this.value)">
+                        <option value="">-- Select Member --</option>
+                        {% for m in members %}
+                        <option value="{{ m.id }}" {% if selected_member == m.id|string %}selected{% endif %}>{{ m.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {% for i in range(1, 7) %}
+                <div class="mb-3">
+                    <label class="form-label">Golfer {{ i }}</label>
+                    <select name="golfer_{{ i }}" id="golfer_{{ i }}" class="golfer-select" required>
+                        <option value="">Search for a golfer...</option>
+                        {% for g in golfers %}
+                        <option value="{{ g.id }}" {% if existing_picks.get(i) == g.id %}selected{% endif %}>{{ g.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endfor %}
+
+                <button type="submit" class="btn btn-masters btn-lg">Save Picks</button>
+                <a href="{{ url_for('tournament', tid=tournament.id) }}" class="btn btn-secondary btn-lg ms-2">Cancel</a>
+            </form>
+
+            <hr>
+            <p class="text-muted small">Golfer not in the list?</p>
+            <form method="POST" action="{{ url_for('add_golfer') }}" class="d-flex gap-2">
+                <input type="text" name="name" class="form-control form-control-sm" placeholder="Add new golfer name" style="max-width: 300px;">
+                <button type="submit" class="btn btn-sm btn-outline-secondary">Add</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.golfer-select').forEach(function(el) {
+        new TomSelect(el, {
+            placeholder: 'Search for a golfer...',
+            allowEmptyOption: true,
+            create: false,
+            sortField: { field: 'text', direction: 'asc' }
+        });
+    });
+});
+
+function loadPicks(memberId) {
+    if (memberId) {
+        window.location.href = '{{ url_for("enter_picks", tid=tournament.id) }}?member_id=' + memberId;
+    }
+}
+</script>
+{% endblock %}

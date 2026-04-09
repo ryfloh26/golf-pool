@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Enter Scores - {{ round_names[round_num-1] }} - Golf Pool{% endblock %}
+{% block content %}
+<div class="card p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Enter Scores &mdash; {{ round_names[round_num-1] }}</h2>
+        <div class="btn-group">
+            {% for i in range(4) %}
+            <a href="{{ url_for('enter_scores', tid=tournament.id, round=i+1) }}"
+               class="btn {% if round_num == i+1 %}btn-masters{% else %}btn-outline-light{% endif %}">
+                {{ round_names[i] }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    <p class="text-muted">{{ tournament.name }} {{ tournament.year }} &mdash; Enter each golfer's score or mark MC (missed cut)</p>
+
+    <form method="POST">
+        <input type="hidden" name="round_number" value="{{ round_num }}">
+
+        {% for member_name, picks in grouped.items() %}
+        <div class="mb-4">
+            <h5 class="border-bottom pb-2">{{ member_name }}</h5>
+            <div class="row g-2">
+                {% for pick in picks %}
+                <div class="col-md-4 col-lg-2 mb-2">
+                    <label class="form-label small">{{ pick.golfer_name }}</label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="number" name="score_{{ pick.pick_id }}"
+                               class="form-control form-control-sm score-input"
+                               value="{% if existing_scores.get(pick.pick_id) and not existing_scores[pick.pick_id].is_mc %}{{ existing_scores[pick.pick_id].score }}{% endif %}"
+                               placeholder="Score"
+                               id="score_{{ pick.pick_id }}"
+                               {% if existing_scores.get(pick.pick_id) and existing_scores[pick.pick_id].is_mc %}disabled{% endif %}>
+                        <div class="form-check" title="Missed Cut">
+                            <input type="checkbox" name="mc_{{ pick.pick_id }}" value="1"
+                                   class="form-check-input mc-check"
+                                   id="mc_{{ pick.pick_id }}"
+                                   {% if existing_scores.get(pick.pick_id) and existing_scores[pick.pick_id].is_mc %}checked{% endif %}
+                                   onchange="toggleScore(this, {{ pick.pick_id }})">
+                            <label class="form-check-label small" for="mc_{{ pick.pick_id }}">MC</label>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+        <button type="submit" class="btn btn-masters btn-lg">Save Scores</button>
+        <a href="{{ url_for('tournament', tid=tournament.id) }}" class="btn btn-secondary btn-lg ms-2">Back to Leaderboard</a>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleScore(checkbox, pickId) {
+    var scoreInput = document.getElementById('score_' + pickId);
+    if (checkbox.checked) {
+        scoreInput.disabled = true;
+        scoreInput.value = '';
+    } else {
+        scoreInput.disabled = false;
+    }
+}
+</script>
+{% endblock %}

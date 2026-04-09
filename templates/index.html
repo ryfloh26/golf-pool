@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <h1 class="mb-4">Tournaments</h1>
+        {% if tournaments %}
+        <div class="list-group mb-4">
+            {% for t in tournaments %}
+            <a href="{{ url_for('tournament', tid=t.id) }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                <span><strong>{{ t.name }}</strong></span>
+                <span class="badge bg-success">{{ t.year }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-light">No tournaments yet. Create one to get started.</p>
+        {% endif %}
+        <a href="{{ url_for('new_tournament') }}" class="btn btn-masters btn-lg">+ New Tournament</a>
+    </div>
+</div>
+{% endblock %}
