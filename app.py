@@ -390,6 +390,57 @@ def build_live_leaderboard(tid):
 
 
 # ---------------------------------------------------------------------------
+# Seed data
+# ---------------------------------------------------------------------------
+
+def seed_pool_data():
+    """Populate the database with The Masters 2026 pool data."""
+    db = get_db()
+
+    # Skip if already seeded
+    if db.execute('SELECT COUNT(*) FROM pool_member').fetchone()[0] > 0:
+        db.close()
+        return False
+
+    # Tournament
+    db.execute('DELETE FROM tournament')
+    db.execute("INSERT INTO tournament (id, name, year, espn_event_id) VALUES (1, 'The Masters', 2026, '401811941')")
+
+    members = ['Griffin','GG','Ray','Debbie','Ryan O.','Josh B.','Elice','Jill','George','Manny',
+               'Chris','Gary','Liz','Alton','Mike C.','Josh','Betty Anne','Jeff','Jake','Coach',
+               'Zach','Richard','Rob','Kenny','Karen']
+
+    picks = [
+        ['C. Young','R. McIlroy','J. Rahm','S. Scheffler','J. Rahm','J. Rahm','S. Scheffler','X. Schauffele','S. Scheffler','R. McIlroy','L. Aberg','J. Rahm','C. Young','S. Scheffler','S. Scheffler','S. Scheffler','H. Matsuyama','S. Scheffler','B. Dechambeau','C. Young','S. Scheffler','L. Aberg','C. Young','S. Scheffler','S. Scheffler'],
+        ['X. Schauffele','T. Fleetwood','L. Aberg','X. Schauffele','C. Young','C. Young','T. Fleetwood','L. Aberg','L. Aberg','L. Aberg','B. Dechambeau','X. Schauffele','T. Fleetwood','B. Dechambeau','X. Schauffele','X. Schauffele','X. Schauffele','X. Schauffele','X. Schauffele','X. Schauffele','J. Rahm','T. Fleetwood','J. Rahm','X. Schauffele','T. Fleetwood'],
+        ['J. Day','M. W. Lee','J. Rose','J. Rose','M. W. Lee','M. Fitzpatrick','R. McIntyre','J. Day','A. Bhatia','M. W. Lee','A. Bhatia','C. Gutterup','C. Gutterup','M. Fitzpatrick','R. McIntyre','C. Gutterup','J. Day','C. Gutterup','S. Lowry','R. McIntyre','C. Gutterup','R. McIntyre','C. Gutterup','V. Hovland','R. McIntyre'],
+        ['J. Rose','A. Bhatia','M. Fitzpatrick','M. Fitzpatrick','M. Fitzpatrick','A. Bhatia','S. W. Kim','J. Rose','R. McIntyre','J. Rose','J. Rose','S. W. Kim','R. McIntyre','J. Rose','J. Rose','J. Rose','M. Fitzpatrick','R. McIntyre','A. Bhatia','A. Bhatia','M. W. Lee','A. Bhatia','J. Rose','J. Rose','A. Bhatia'],
+        ['A. Scott','A. Scott','B. Koepka','A. Scott','B. Koepka','J. Spaun','J. Spieth','J. Thomas','B. Koepka','McNealy','A. Scott','J. Spieth','J. Spieth','N. Hojgaard','J. Knapp','A. Scott','J. Spieth','S. Straka','S. Straka','P. Reed','A. Scott','R. Henley','B. Koepka','A. Scott','R. Henley'],
+        ['M. Homa','P. Reed','P. Reed','J. Knapp','A. Scott','P. Reed','J. Spaun','M. Homa','J. Spaun','P. Reed','H. English','P. Reed','M. McNealy','C. Conners','P. Reed','C. Conners','J. Spaun','J. Spaun','C. Conners','C. Conners','P. Reed','C. Conners','P. Reed','S. Straka','P. Reed'],
+    ]
+
+    member_ids = {}
+    for name in members:
+        db.execute('INSERT INTO pool_member (name, tournament_id) VALUES (?, 1)', (name,))
+        member_ids[name] = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+
+    for pick_order, pick_row in enumerate(picks):
+        for i, golfer_name in enumerate(pick_row):
+            row = db.execute('SELECT id FROM golfer WHERE name = ?', (golfer_name,)).fetchone()
+            if row:
+                golfer_id = row[0]
+            else:
+                db.execute('INSERT INTO golfer (name) VALUES (?)', (golfer_name,))
+                golfer_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+            db.execute('INSERT INTO pick (pool_member_id, golfer_id, pick_order) VALUES (?, ?, ?)',
+                       (member_ids[members[i]], golfer_id, pick_order + 1))
+
+    db.commit()
+    db.close()
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
@@ -932,7 +983,9 @@ def delete_member(tid, mid):
     return redirect(url_for('tournament', tid=tid))
 
 
+init_db()
+seed_golfers()
+seed_pool_data()
+
 if __name__ == '__main__':
-    init_db()
-    seed_golfers()
     app.run(debug=True, port=5001)
