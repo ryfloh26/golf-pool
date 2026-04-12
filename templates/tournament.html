@@ -50,7 +50,7 @@
     .pool-grid .final-row td { border-top: 3px solid #333; }
     .pool-grid .placement-row { background: #fff3cd; }
     .pool-grid .placement-row td { font-weight: bold; text-align: center; font-size: 0.95em; }
-    .pool-grid .mc { color: #dc3545; font-weight: bold; }
+    .pool-grid .mc { color: #999; font-weight: normal; }
     .pool-grid .used-score { color: #dc3545; font-weight: bold; }
     .pool-grid .first-place { background: #ffd700; color: #333; }
     .pool-grid .second-place { background: #e0e0e0; color: #333; }
@@ -151,14 +151,13 @@
                         {% set s = g.scores.get(rnd) %}
                         {% set is_used = rnd in g.get('used_rounds', []) %}
                         <td class="col-name">{% if g.thru and g.thru not in ['F', '--', ''] and tournament_status == 'in' %}<span class="golfer-live"></span>{% endif %}{{ g.name }}</td>
-                        <td class="col-score{% if is_used %} used-score{% endif %}">
-                            {% if s %}
-                                {% if s.is_mc %}<span class="mc">MC</span>
-                                {% elif s.score is not none %}{{ s.score }}
+                        {% set show_mc = (s and s.is_mc) or (g.missed_cut and rnd > 2) %}
+                        <td class="col-score{% if is_used and not show_mc %} used-score{% endif %}">
+                            {% if show_mc %}<span class="mc">MC</span>
+                            {% elif s %}
+                                {% if s.score is not none %}{{ s.score }}
                                 {% else %}-{% endif %}
-                            {% else %}
-                                {% if g.missed_cut and rnd > 2 %}<span class="mc">MC</span>{% else %}-{% endif %}
-                            {% endif %}
+                            {% else %}-{% endif %}
                         </td>
                     {% else %}
                         <td class="col-name">-</td>

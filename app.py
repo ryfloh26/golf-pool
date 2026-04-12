@@ -168,19 +168,34 @@ def parse_espn_competitors(data):
             continue
 
         # Per-round scores from linescores
+        # ESPN sends value=0 with displayValue="-" for unplayed rounds
         round_scores = {}
         missed_cut = False
+        played_rounds = 0
         for ls in comp.get('linescores', []):
             rnd = ls.get('period', 0)
             val = ls.get('value')
-            if val is not None:
+            display = ls.get('displayValue', '')
+            # Skip unplayed rounds (value=0, displayValue="-")
+            if val is not None and val != 0:
                 round_scores[rnd] = int(val)
+                played_rounds += 1
+            elif val == 0 and display not in ('-', '', None):
+                # Genuine score of 0 (extremely unlikely in golf but handle it)
+                round_scores[rnd] = 0
+                played_rounds += 1
 
-        # Detect missed cut: player has only 2 rounds in a tournament that's past round 2
-        total_rounds_available = len(comp.get('linescores', []))
+        # Detect missed cut
         status_detail = comp.get('status', {}).get('type', {}).get('description', '')
         if 'cut' in status_detail.lower():
             missed_cut = True
+        # Also detect MC if player only has 2 real rounds and round 3 has started
+        # (ESPN sometimes doesn't set the cut status text)
+        elif played_rounds == 2 and len(comp.get('linescores', [])) >= 3:
+            # Round 3 linescore exists but value is 0 with "-" display = cut
+            ls3 = [ls for ls in comp.get('linescores', []) if ls.get('period') == 3]
+            if ls3 and ls3[0].get('value') == 0 and ls3[0].get('displayValue', '') in ('-', '', None):
+                missed_cut = True
 
         competitors[name] = {
             'round_scores': round_scores,
