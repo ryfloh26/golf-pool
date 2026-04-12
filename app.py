@@ -565,10 +565,10 @@ def export_excel(tid):
     entries = sorted(leaderboard, key=lambda x: x['member']['name'])
 
     # Compute placements
-    ranked = sorted(leaderboard, key=lambda x: (x['final'] is None, x['final'] or 999))
+    ranked = sorted(leaderboard, key=lambda x: (x['final'] == 'MC', x['final'] is None, x['final'] if isinstance(x['final'], (int, float)) else 999))
     placement_map = {}
     for idx, entry in enumerate(ranked):
-        if entry['final'] is not None:
+        if entry['final'] is not None and entry['final'] != 'MC':
             placement_map[entry['member']['name']] = idx + 1
 
     # Low round (Sunday only, outside top 4)
