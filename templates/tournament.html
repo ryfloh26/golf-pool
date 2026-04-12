@@ -173,7 +173,8 @@
                     {% for entry in leaderboard_by_name %}
                     <td></td>
                     <td class="col-score">
-                        {% if entry.round_totals[rnd_idx] is not none %}
+                        {% if entry.round_totals[rnd_idx] == 'MC' %}<span class="mc">MC</span>
+                        {% elif entry.round_totals[rnd_idx] is not none %}
                             {{ "%.2f"|format(entry.round_totals[rnd_idx]) }}
                         {% else %}-{% endif %}
                     </td>
@@ -207,7 +208,8 @@
                     {% for entry in leaderboard_by_name %}
                     <td></td>
                     <td class="col-score">
-                        {% if entry.final is not none %}
+                        {% if entry.final == 'MC' %}<span class="mc">MC</span>
+                        {% elif entry.final is not none %}
                             {{ "%.2f"|format(entry.final) }}
                         {% else %}-{% endif %}
                     </td>
@@ -264,12 +266,12 @@
                 <td><strong>{{ loop.index }}</strong></td>
                 <td><strong>{% if entry.any_live and tournament_status == 'in' %}<span class="golfer-live"></span>{% endif %}{{ entry.member.name }}</strong></td>
                 {% for rt in entry.round_totals %}
-                <td class="text-center">{% if rt is not none %}{{ "%.2f"|format(rt) }}{% else %}-{% endif %}</td>
+                <td class="text-center">{% if rt == 'MC' %}<span class="mc">MC</span>{% elif rt is not none %}{{ "%.2f"|format(rt) }}{% else %}-{% endif %}</td>
                 {% endfor %}
                 {% for i in range(4 - entry.round_totals|length) %}
                 <td class="text-center">-</td>
                 {% endfor %}
-                <td class="text-center"><strong>{% if entry.final is not none %}{{ "%.2f"|format(entry.final) }}{% else %}-{% endif %}</strong></td>
+                <td class="text-center"><strong>{% if entry.final == 'MC' %}<span class="mc">MC</span>{% elif entry.final is not none %}{{ "%.2f"|format(entry.final) }}{% else %}-{% endif %}</strong></td>
                 <td>
                     {% if entry.placement == 1 %}<span class="payout-badge payout-1st">1st</span>
                     {% elif entry.placement == 2 %}<span class="payout-badge payout-2nd">2nd</span>

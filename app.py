@@ -344,18 +344,29 @@ def build_live_leaderboard(tid):
 
         # Calculate per-round averages (best 4 of 6)
         # Track which golfers' scores are used (for red highlighting)
+        # For rounds 3-4, MC golfers are excluded. If fewer than 4 golfers
+        # made the cut, the member is eliminated (round total = 'MC').
+        member_eliminated = False
         for rnd in range(1, 5):
             scored = []  # list of (score, golfer_index)
+            eligible_count = 0  # golfers who could play this round
             for gi, gd in enumerate(golfer_data):
+                # Rounds 3-4: MC golfers can't play
+                if gd['missed_cut'] and rnd > 2:
+                    continue
+                eligible_count += 1
                 if rnd in gd['scores']:
                     s = gd['scores'][rnd]
-                    if gd['missed_cut'] and rnd > 2:
-                        continue
                     if s.get('is_mc'):
                         continue
                     if s['score'] is not None:
                         scored.append((s['score'], gi))
-            if len(scored) >= 4:
+
+            # For rounds 3-4, if fewer than 4 golfers made the cut, member is eliminated
+            if rnd > 2 and eligible_count < 4:
+                round_totals.append('MC')
+                member_eliminated = True
+            elif len(scored) >= 4:
                 scored.sort(key=lambda x: x[0])
                 best4 = scored[:4]
                 round_totals.append(sum(s for s, _ in best4) / 4)
@@ -365,9 +376,12 @@ def build_live_leaderboard(tid):
                 round_totals.append(None)
 
         final = None
-        valid_totals = [rt for rt in round_totals if rt is not None]
-        if valid_totals:
-            final = sum(valid_totals) / len(valid_totals)
+        if member_eliminated:
+            final = 'MC'
+        else:
+            valid_totals = [rt for rt in round_totals if rt is not None and rt != 'MC']
+            if valid_totals:
+                final = sum(valid_totals) / len(valid_totals)
 
         # Check if any golfer for this member is currently on the course
         any_live = any(
@@ -383,7 +397,7 @@ def build_live_leaderboard(tid):
             'any_live': any_live,
         })
 
-    leaderboard.sort(key=lambda x: (x['final'] is None, x['final'] or 999))
+    leaderboard.sort(key=lambda x: (x['final'] == 'MC', x['final'] is None, x['final'] if isinstance(x['final'], (int, float)) else 999))
     db.close()
 
     return leaderboard, tournament_status, t
@@ -484,11 +498,11 @@ def tournament(tid):
         return redirect(url_for('index'))
 
     # Ranked version (sorted by final score, lowest first)
-    leaderboard_ranked = sorted(leaderboard, key=lambda x: (x['final'] is None, x['final'] or 999))
+    leaderboard_ranked = sorted(leaderboard, key=lambda x: (x['final'] == 'MC', x['final'] is None, x['final'] if isinstance(x['final'], (int, float)) else 999))
 
     # Assign placements to each entry
     for idx, entry in enumerate(leaderboard_ranked):
-        entry['placement'] = idx + 1 if entry['final'] is not None else None
+        entry['placement'] = idx + 1 if entry['final'] is not None and entry['final'] != 'MC' else None
 
     # Find low round: lowest Sunday (round 4) average among members NOT in top 4
     low_round_winner = None
@@ -497,7 +511,7 @@ def tournament(tid):
     for entry in leaderboard_ranked:
         if entry['placement'] is not None and entry['placement'] <= 4:
             continue  # skip top 4 finishers
-        if len(entry['round_totals']) >= 4 and entry['round_totals'][3] is not None:
+        if len(entry['round_totals']) >= 4 and entry['round_totals'][3] is not None and entry['round_totals'][3] != 'MC':
             rt = entry['round_totals'][3]
             if low_round_value is None or rt < low_round_value:
                 low_round_value = rt
@@ -549,7 +563,7 @@ def export_excel(tid):
         p = placement_map.get(entry['member']['name'])
         if p is not None and p <= 4:
             continue
-        if len(entry['round_totals']) >= 4 and entry['round_totals'][3] is not None:
+        if len(entry['round_totals']) >= 4 and entry['round_totals'][3] is not None and entry['round_totals'][3] != 'MC':
             rt = entry['round_totals'][3]
             if lr_value is None or rt < lr_value:
                 lr_value = rt
@@ -661,7 +675,7 @@ def export_excel(tid):
             ws.cell(row=row, column=nc).fill = total_fill
             ws.cell(row=row, column=nc).border = thin_border
             rt = entry['round_totals'][rnd_idx]
-            tc = ws.cell(row=row, column=sc, value=round(rt, 2) if rt is not None else None)
+            tc = ws.cell(row=row, column=sc, value='MC' if rt == 'MC' else (round(rt, 2) if rt is not None else None))
             tc.font = total_font
             tc.fill = total_fill
             tc.alignment = Alignment(horizontal='center')
@@ -716,7 +730,7 @@ def export_excel(tid):
         ws.cell(row=row, column=nc).fill = final_fill
         ws.cell(row=row, column=nc).border = thin_border
         fc = ws.cell(row=row, column=sc,
-                     value=round(entry['final'], 2) if entry['final'] is not None else None)
+                     value='MC' if entry['final'] == 'MC' else (round(entry['final'], 2) if entry['final'] is not None else None))
         fc.font = final_font
         fc.fill = final_fill
         fc.alignment = Alignment(horizontal='center')
