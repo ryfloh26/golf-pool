@@ -72,6 +72,12 @@ def init_db():
         db.execute('SELECT espn_event_id FROM tournament LIMIT 1')
     except sqlite3.OperationalError:
         db.execute('ALTER TABLE tournament ADD COLUMN espn_event_id TEXT')
+    # ESPN scoreboard ignores ?event= and returns the current tournament, so
+    # past tournaments must be keyed by date (YYYYMMDD). Re-key the Masters.
+    db.execute(
+        "UPDATE tournament SET espn_event_id='20260410' "
+        "WHERE name='The Masters' AND year=2026 AND espn_event_id='401811941'"
+    )
     db.commit()
     db.close()
 
@@ -422,18 +428,49 @@ def build_live_leaderboard(tid):
 # Seed data
 # ---------------------------------------------------------------------------
 
+def _insert_pool(db, tournament_id, members, picks):
+    """Insert pool members and their picks for a tournament.
+    picks is a list of 6 rows, each row a list of golfer names (one per member,
+    by member index). Empty/None pick rows are skipped (member excluded if all 6 are empty).
+    """
+    # Determine which members have at least one non-empty pick
+    keep = []
+    for mi, name in enumerate(members):
+        if any(picks[r][mi] for r in range(6)):
+            keep.append((mi, name))
+
+    member_ids = {}
+    for _, name in keep:
+        db.execute('INSERT INTO pool_member (name, tournament_id) VALUES (?, ?)', (name, tournament_id))
+        member_ids[name] = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+
+    for pick_order in range(6):
+        for mi, name in keep:
+            golfer_name = picks[pick_order][mi]
+            if not golfer_name:
+                continue
+            row = db.execute('SELECT id FROM golfer WHERE name = ?', (golfer_name,)).fetchone()
+            if row:
+                golfer_id = row[0]
+            else:
+                db.execute('INSERT INTO golfer (name) VALUES (?)', (golfer_name,))
+                golfer_id = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+            db.execute('INSERT INTO pick (pool_member_id, golfer_id, pick_order) VALUES (?, ?, ?)',
+                       (member_ids[name], golfer_id, pick_order + 1))
+
+
 def seed_pool_data():
     """Populate the database with The Masters 2026 pool data."""
     db = get_db()
 
-    # Skip if already seeded
-    if db.execute('SELECT COUNT(*) FROM pool_member').fetchone()[0] > 0:
+    # Skip if Masters is already seeded
+    if db.execute("SELECT COUNT(*) FROM tournament WHERE id=1").fetchone()[0] > 0:
         db.close()
         return False
 
-    # Tournament
-    db.execute('DELETE FROM tournament')
-    db.execute("INSERT INTO tournament (id, name, year, espn_event_id) VALUES (1, 'The Masters', 2026, '401811941')")
+    # Use a date during the Masters; ESPN's scoreboard ignores ?event= and
+    # always returns the *current* tournament, so we key past events by date.
+    db.execute("INSERT INTO tournament (id, name, year, espn_event_id) VALUES (1, 'The Masters', 2026, '20260410')")
 
     members = ['Griffin','GG','Ray','Debbie','Ryan O.','Josh B.','Elice','Jill','George','Manny',
                'Chris','Gary','Liz','Alton','Mike C.','Josh','Betty Anne','Jeff','Jake','Coach',
@@ -464,6 +501,44 @@ def seed_pool_data():
             db.execute('INSERT INTO pick (pool_member_id, golfer_id, pick_order) VALUES (?, ?, ?)',
                        (member_ids[members[i]], golfer_id, pick_order + 1))
 
+    db.commit()
+    db.close()
+    return True
+
+
+def seed_pga_data():
+    """Populate the database with the 2026 PGA Championship pool (tournament id=2)."""
+    db = get_db()
+
+    # Skip if PGA Championship 2026 already exists
+    existing = db.execute(
+        "SELECT id FROM tournament WHERE name='PGA Championship' AND year=2026"
+    ).fetchone()
+    if existing:
+        db.close()
+        return False
+
+    db.execute(
+        "INSERT INTO tournament (name, year, espn_event_id) VALUES ('PGA Championship', 2026, '401811947')"
+    )
+    tid = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+
+    # Order MUST match the picks rows below
+    members = ['Griffin','GG','Ray','Debbie','Ryan O.','Josh B.','Elice','Jill','George','Manny',
+               'Chris','Gary','Liz','Alton','Mike C.','Josh','Betty Anne','Jeff','Jake','Coach',
+               'Bob','Richard','Rob','Kenny','Karen','Colin']
+
+    # 6 pick rows, each entry = pick for member at that index. None = no pick.
+    picks = [
+        ['M. Fitzpatrick','S. Scheffler','S. Scheffler','L. Aberg','S. Scheffler','S. Scheffler','C. Morikawa','C. Morikawa','R. McIlroy','S. Scheffler',None,'R. McIlroy','S. Scheffler','S. Scheffler',None,'X. Schauffele','S. Scheffler','S. Scheffler','M. Fitzpatrick','S. Scheffler','S. Scheffler','M. Fitzpatrick','S. Scheffler','S. Scheffler','S. Scheffler','M. Fitzpatrick'],
+        ['X. Schauffele','R. McIlroy','C. Young','C. Young','C. Young','R. McIlroy','T. Fleetwood','X. Schauffele','T. Fleetwood','C. Young',None,'C. Young','X. Schauffele','T. Fleetwood',None,'C. Young','C. Young','C. Young','T. Fleetwood','C. Young','B. DeChambeau','T. Fleetwood','R. McIlroy','R. McIlroy','T. Fleetwood','C. Young'],
+        ['R. McIntyre','M W Lee','N. Hojgaard','C. Gutterup','C. Gutterup','M W Lee','M W Lee','M W Lee','J. Rose','N. Hojgaard',None,'C. Gutterup','J. Rose','M W Lee',None,'C. Gutterup','H. Matsuyama','C. Gutterup','V. Hovland','C. Gutterup','J. Rose','J. Rose','J. Rose','J. Rose','J. Rose','J. Rose'],
+        ['V. Hovland','B. Koepka','J. Rose','J. Rose','S.W. Kim','B. Koepka','S. Lowry','H. Matsuyama','S. Lowry','S.W. Kim',None,'S. Lowry','V. Hovland','B. Koepka',None,'S.W. Kim','J. Rose','J. Rose','S.W. Kim','S.W. Kim','S. Lowry','R. McIntyre','C. Gutterup','B. Koepka','H. Matsuyama','S.W. Kim'],
+        ['R. Fowler','J. thomas','R. Fowler','R. Henley','R. Fowler','R. Fowler','R. Fowler','R. Fowler','R. Fowler','J. thomas',None,'P. Cantley','J. thomas','P. Cantley',None,'J. thomas','R. Fowler','S. Burns','R. Henley','C. Conners','P. Cantley','C. Conners','R. Fowler','J. Spieth','S. Burns','R. Fowler'],
+        ['A. Scott','A. Bhatia','J. thomas','R. Fowler','J. Spieth','S. Burns','J. Spieth','A. Scott','S. Burns','J. Spieth',None,'S. Burns','R. Fowler','S. Burns',None,'R. Fowler','J. Spieth','J. Spieth','Smotherman','R. Fowler','R. Fowler','R. Henley','P. Cantley','J. Thomas','R. Henley','J. thomas'],
+    ]
+
+    _insert_pool(db, tid, members, picks)
     db.commit()
     db.close()
     return True
@@ -1015,6 +1090,7 @@ def delete_member(tid, mid):
 init_db()
 seed_golfers()
 seed_pool_data()
+seed_pga_data()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
