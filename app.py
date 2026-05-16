@@ -78,6 +78,19 @@ def init_db():
         "UPDATE tournament SET espn_event_id='20260410' "
         "WHERE name='The Masters' AND year=2026 AND espn_event_id='401811941'"
     )
+    # Josh B.'s 2nd PGA Championship pick was corrected from R. McIlroy to C. Young.
+    young = db.execute("SELECT id FROM golfer WHERE name='C. Young'").fetchone()
+    if young:
+        db.execute('''
+            UPDATE pick SET golfer_id=?
+            WHERE pick_order=2
+              AND pool_member_id IN (
+                SELECT pm.id FROM pool_member pm
+                JOIN tournament t ON t.id = pm.tournament_id
+                WHERE pm.name='Josh B.' AND t.name='PGA Championship' AND t.year=2026
+              )
+              AND golfer_id IN (SELECT id FROM golfer WHERE name='R. McIlroy')
+        ''', (young['id'],))
     db.commit()
     db.close()
 
@@ -529,7 +542,7 @@ def seed_pga_data():
     # 6 pick rows, each entry = pick for member at that index. None = no pick.
     picks = [
         ['M. Fitzpatrick','S. Scheffler','S. Scheffler','L. Aberg','S. Scheffler','S. Scheffler','C. Morikawa','C. Morikawa','R. McIlroy','S. Scheffler',None,'R. McIlroy','S. Scheffler','S. Scheffler',None,'X. Schauffele','S. Scheffler','S. Scheffler','M. Fitzpatrick','S. Scheffler','S. Scheffler','M. Fitzpatrick','S. Scheffler','S. Scheffler','S. Scheffler','M. Fitzpatrick'],
-        ['X. Schauffele','R. McIlroy','C. Young','C. Young','C. Young','R. McIlroy','T. Fleetwood','X. Schauffele','T. Fleetwood','C. Young',None,'C. Young','X. Schauffele','T. Fleetwood',None,'C. Young','C. Young','C. Young','T. Fleetwood','C. Young','B. DeChambeau','T. Fleetwood','R. McIlroy','R. McIlroy','T. Fleetwood','C. Young'],
+        ['X. Schauffele','R. McIlroy','C. Young','C. Young','C. Young','C. Young','T. Fleetwood','X. Schauffele','T. Fleetwood','C. Young',None,'C. Young','X. Schauffele','T. Fleetwood',None,'C. Young','C. Young','C. Young','T. Fleetwood','C. Young','B. DeChambeau','T. Fleetwood','R. McIlroy','R. McIlroy','T. Fleetwood','C. Young'],
         ['R. McIntyre','M W Lee','N. Hojgaard','C. Gutterup','C. Gutterup','M W Lee','M W Lee','M W Lee','J. Rose','N. Hojgaard',None,'C. Gutterup','J. Rose','M W Lee',None,'C. Gutterup','H. Matsuyama','C. Gutterup','V. Hovland','C. Gutterup','J. Rose','J. Rose','J. Rose','J. Rose','J. Rose','J. Rose'],
         ['V. Hovland','B. Koepka','J. Rose','J. Rose','S.W. Kim','B. Koepka','S. Lowry','H. Matsuyama','S. Lowry','S.W. Kim',None,'S. Lowry','V. Hovland','B. Koepka',None,'S.W. Kim','J. Rose','J. Rose','S.W. Kim','S.W. Kim','S. Lowry','R. McIntyre','C. Gutterup','B. Koepka','H. Matsuyama','S.W. Kim'],
         ['R. Fowler','J. thomas','R. Fowler','R. Henley','R. Fowler','R. Fowler','R. Fowler','R. Fowler','R. Fowler','J. thomas',None,'P. Cantley','J. thomas','P. Cantley',None,'J. thomas','R. Fowler','S. Burns','R. Henley','C. Conners','P. Cantley','C. Conners','R. Fowler','J. Spieth','S. Burns','R. Fowler'],
