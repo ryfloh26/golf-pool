@@ -191,17 +191,15 @@ def parse_espn_competitors(data):
                 round_scores[rnd] = 0
                 played_rounds += 1
 
-        # Detect missed cut
+        # Detect missed cut. ESPN gives made-cut-but-not-teed-off players a
+        # placeholder R3/R4 linescore (value=0, display='-'); missed-cut
+        # players have ONLY R1 and R2 entries — no R3 placeholder at all.
         status_detail = comp.get('status', {}).get('type', {}).get('description', '')
+        all_linescores = comp.get('linescores', [])
         if 'cut' in status_detail.lower():
             missed_cut = True
-        # Also detect MC if player only has 2 real rounds and round 3 has started
-        # (ESPN sometimes doesn't set the cut status text)
-        elif played_rounds == 2 and len(comp.get('linescores', [])) >= 3:
-            # Round 3 linescore exists but value is 0 with "-" display = cut
-            ls3 = [ls for ls in comp.get('linescores', []) if ls.get('period') == 3]
-            if ls3 and ls3[0].get('value') == 0 and ls3[0].get('displayValue', '') in ('-', '', None):
-                missed_cut = True
+        elif played_rounds == 2 and len(all_linescores) <= 2:
+            missed_cut = True
 
         competitors[name] = {
             'round_scores': round_scores,
