@@ -1,6 +1,26 @@
 {% extends "base.html" %}
 {% block title %}{{ tournament.name }} - Golf Pool{% endblock %}
 {% block extra_head %}
+{% if tournament.name == 'U.S. Open' %}
+<style>
+    /* U.S. Open: red / white / blue scheme matching the spreadsheet
+       (accent1 blue #4472C4 header bars, red final row). */
+    :root {
+        --c-deep: #0a2a52;
+        --c-navbar: #06203f;
+        --c-primary: #2f5496;
+        --c-accent: #c8102e;
+        --c-accent-text: #fff;
+        --c-btn-hover-bg: #1d3b73;
+        --c-btn-hover-text: #fff;
+        --c-round-bg: #1d3b73;
+        --c-round-fg: #ffffff;
+        --c-total-bg: #dde6f5;
+        --c-final-bg: #c8102e;
+        --c-final-fg: #fff;
+    }
+</style>
+{% endif %}
 <style>
     .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
     .status-dot.live { background: #00ff88; animation: pulse 2s infinite; }
@@ -22,7 +42,7 @@
         vertical-align: middle;
     }
     .pool-grid .member-header {
-        background: #2d5a3d;
+        background: var(--c-primary);
         color: #fff;
         text-align: center;
         font-weight: bold;
@@ -31,19 +51,19 @@
     .pool-grid .col-name { min-width: 120px; }
     .pool-grid .col-score { min-width: 50px; text-align: center; }
     .pool-grid .round-label {
-        background: #1a472a;
-        color: #ffd700;
+        background: var(--c-round-bg);
+        color: var(--c-round-fg);
         font-weight: bold;
         font-size: 0.95em;
     }
     .pool-grid .total-row {
-        background: #e8f5e9;
+        background: var(--c-total-bg);
         font-weight: bold;
     }
-    .pool-grid .total-row td { border-top: 2px solid #2d5a3d; }
+    .pool-grid .total-row td { border-top: 2px solid var(--c-primary); }
     .pool-grid .final-row {
-        background: #ffd700;
-        color: #333;
+        background: var(--c-final-bg);
+        color: var(--c-final-fg);
         font-weight: bold;
         font-size: 1em;
     }
@@ -58,7 +78,7 @@
     .pool-grid .fourth-place { background: #d4edda; color: #333; }
     .pool-grid .low-round { background: #e8daef; color: #6c3483; }
     .pool-grid .name-footer {
-        background: #2d5a3d;
+        background: var(--c-primary);
         color: #fff;
         text-align: center;
         font-weight: bold;
@@ -245,7 +265,7 @@
     {% endif %}
     <table class="table table-hover mb-0" style="color:#333;">
         <thead>
-            <tr style="background:#2d5a3d;color:#fff;">
+            <tr style="background:var(--c-primary);color:#fff;">
                 <th>#</th>
                 <th>Name</th>
                 {% for rn in round_names %}
