@@ -78,6 +78,13 @@ def init_db():
         "UPDATE tournament SET espn_event_id='20260410' "
         "WHERE name='The Masters' AND year=2026 AND espn_event_id='401811941'"
     )
+    # Same fix for the PGA Championship: once another event is live, ESPN's
+    # ?event= query returns the *current* tournament, so the PGA page pulled
+    # live U.S. Open data. Re-key it to its start date (2026-05-14).
+    db.execute(
+        "UPDATE tournament SET espn_event_id='20260514' "
+        "WHERE name='PGA Championship' AND year=2026 AND espn_event_id='401811947'"
+    )
     # Josh B.'s 2nd PGA Championship pick was corrected from R. McIlroy to C. Young.
     young = db.execute("SELECT id FROM golfer WHERE name='C. Young'").fetchone()
     if young:
@@ -180,7 +187,24 @@ def parse_espn_competitors(data):
     if 'competitions' not in event or not event['competitions']:
         return {}, tournament_status
 
-    for comp in event['competitions'][0].get('competitors', []):
+    comp_block = event['competitions'][0]
+    tournament_complete = tournament_status == 'post'
+
+    # Round currently being played (1-4). Rounds strictly before this are
+    # finished; the current round is still in progress unless the event is over.
+    # ESPN reports an in-progress round's `value` as a partial stroke count
+    # (e.g. strokes through 9 holes), which is NOT a valid round total, so we
+    # only count a round once it's complete.
+    current_round = (comp_block.get('status', {}).get('period')
+                     or event.get('status', {}).get('period'))
+    if current_round is None:
+        # Unknown round: count any non-zero round value (pre-fix behavior).
+        current_round = 99
+    # The 36-hole cut is only set after round 2; until then no missed-cut /
+    # MC rules should apply and rounds 3-4 must stay empty.
+    cut_in_effect = tournament_complete or current_round >= 3
+
+    for comp in comp_block.get('competitors', []):
         athlete = comp.get('athlete', {})
         name = athlete.get('displayName', '')
         if not name:
@@ -195,6 +219,11 @@ def parse_espn_competitors(data):
             rnd = ls.get('period', 0)
             val = ls.get('value')
             display = ls.get('displayValue', '')
+            # Only count a round once it's complete: rounds before the current
+            # one, or any round when the event is final. Skip the in-progress
+            # round — its value is a partial (not-yet-18-holes) stroke count.
+            if not (tournament_complete or rnd < current_round):
+                continue
             # Skip unplayed rounds (value=0, displayValue="-")
             if val is not None and val != 0:
                 round_scores[rnd] = int(val)
@@ -204,15 +233,17 @@ def parse_espn_competitors(data):
                 round_scores[rnd] = 0
                 played_rounds += 1
 
-        # Detect missed cut. ESPN gives made-cut-but-not-teed-off players a
-        # placeholder R3/R4 linescore (value=0, display='-'); missed-cut
-        # players have ONLY R1 and R2 entries — no R3 placeholder at all.
+        # Detect missed cut — only once the cut is actually in effect (round 3+
+        # or final). ESPN gives made-cut-but-not-teed-off players a placeholder
+        # R3/R4 linescore (value=0, display='-'); missed-cut players have ONLY
+        # R1 and R2 entries — no R3 placeholder at all.
         status_detail = comp.get('status', {}).get('type', {}).get('description', '')
         all_linescores = comp.get('linescores', [])
-        if 'cut' in status_detail.lower():
-            missed_cut = True
-        elif played_rounds == 2 and len(all_linescores) <= 2:
-            missed_cut = True
+        if cut_in_effect:
+            if 'cut' in status_detail.lower():
+                missed_cut = True
+            elif played_rounds == 2 and len(all_linescores) <= 2:
+                missed_cut = True
 
         competitors[name] = {
             'round_scores': round_scores,
@@ -530,7 +561,7 @@ def seed_pga_data():
         return False
 
     db.execute(
-        "INSERT INTO tournament (name, year, espn_event_id) VALUES ('PGA Championship', 2026, '401811947')"
+        "INSERT INTO tournament (name, year, espn_event_id) VALUES ('PGA Championship', 2026, '20260514')"
     )
     tid = db.execute('SELECT last_insert_rowid()').fetchone()[0]
 
