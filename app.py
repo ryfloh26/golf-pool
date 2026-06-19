@@ -190,18 +190,11 @@ def parse_espn_competitors(data):
     comp_block = event['competitions'][0]
     tournament_complete = tournament_status == 'post'
 
-    # Round currently being played (1-4). Rounds strictly before this are
-    # finished; the current round is still in progress unless the event is over.
-    # ESPN reports an in-progress round's `value` as a partial stroke count
-    # (e.g. strokes through 9 holes), which is NOT a valid round total, so we
-    # only count a round once it's complete.
+    # The 36-hole cut is only set after round 2; until then no missed-cut / MC
+    # rules should apply (and rounds 3-4 must stay empty). The tournament's
+    # current round tells us when that is.
     current_round = (comp_block.get('status', {}).get('period')
-                     or event.get('status', {}).get('period'))
-    if current_round is None:
-        # Unknown round: count any non-zero round value (pre-fix behavior).
-        current_round = 99
-    # The 36-hole cut is only set after round 2; until then no missed-cut /
-    # MC rules should apply and rounds 3-4 must stay empty.
+                     or event.get('status', {}).get('period') or 1)
     cut_in_effect = tournament_complete or current_round >= 3
 
     for comp in comp_block.get('competitors', []):
@@ -219,10 +212,13 @@ def parse_espn_competitors(data):
             rnd = ls.get('period', 0)
             val = ls.get('value')
             display = ls.get('displayValue', '')
-            # Only count a round once it's complete: rounds before the current
-            # one, or any round when the event is final. Skip the in-progress
-            # round — its value is a partial (not-yet-18-holes) stroke count.
-            if not (tournament_complete or rnd < current_round):
+            # Count a round only once THIS golfer has completed all 18 holes of
+            # it (or the event is final). ESPN reports an in-progress round's
+            # `value` as a partial stroke count (strokes through the holes
+            # played so far) — not a valid round total. The per-hole breakdown
+            # lives in the nested `linescores` array, so 18 entries == complete.
+            holes_played = len(ls.get('linescores', []))
+            if not (tournament_complete or holes_played >= 18):
                 continue
             # Skip unplayed rounds (value=0, displayValue="-")
             if val is not None and val != 0:
