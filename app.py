@@ -555,6 +555,45 @@ def seed_pga_data():
     return True
 
 
+def seed_usopen_data():
+    """Populate the database with the 2026 U.S. Open pool (tournament id=3)."""
+    db = get_db()
+
+    # Skip if U.S. Open 2026 already exists
+    existing = db.execute(
+        "SELECT id FROM tournament WHERE name='U.S. Open' AND year=2026"
+    ).fetchone()
+    if existing:
+        db.close()
+        return False
+
+    # U.S. Open 2026 ran June 18-21. ESPN's scoreboard ignores ?event= and
+    # returns the current tournament, so key past events by their start date.
+    db.execute(
+        "INSERT INTO tournament (name, year, espn_event_id) VALUES ('U.S. Open', 2026, '20260618')"
+    )
+    tid = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+
+    # Order MUST match the picks rows below
+    members = ['Griffin','GG','Ray','Debbie','Josh B.','Jill','George','Chris','Gary','Liz',
+               'Alton','Mike C.','Josh','Betty Anne','Jeff','Jake','Coach','Richard','Rob','Kenny','Karen']
+
+    # 6 pick rows, each entry = pick for member at that index. None = no pick.
+    picks = [
+        ['R. McIlroy','C. Young','C. Young','S. Scheffler','S. Scheffler','X. Schauffele','S. Scheffler','M. Fitzpatrick','S. Scheffler','S. Scheffler','S. Scheffler','S. Scheffler','C. Young','S. Scheffler','S. Scheffler','C. Young','S. Scheffler','S. Scheffler','S. Scheffler','S. Scheffler','S. Scheffler'],
+        ['X. Schauffele','T. Fleetwood','S. Scheffler','X. Schauffele','J. Rahm','M. Fitzpatrick','X. Schauffele','S. Scheffler','X. Schauffele','T. Fleetwood','R. McIlroy','R. McIlroy','X. Schauffele','R. McIlroy','X. Schauffele','X. Schauffele','C. Young','R. McIlroy','R. McIlroy','X. Schauffele','M. Fitzpatrick'],
+        ['M. W. Lee','J. Rose','C. Gutterup','C. Gutterup','S.W. Kim','V. Hovland','C. Gutterup','C. Gutterup','J. Rose','S.W. Kim','C. Gutterup','B. Koepka','C. Morikawa','S. Burns','C. Morikawa','C. Gutterup','S. Burns','C. Morikawa','C. Morikawa','J. Rose','C. Gutterup'],
+        ['S. Burns','S. Burns','M. W. Lee','S. Burns','S. Burns','S. Burns','S.W. Kim','V. Hovland','S. Burns','S. Burns','S. Burns','S. Burns','J. Rose','J. Rose','S. Burns','S. Burns','J. Rose','B. Koepka','B. Koepka','B. Koepka','N. Hojgaard'],
+        ['A. Scott','R. Fowler','J. Thomas','J. Thomas','P. Reed','R. Fowler','P. Reed','J. Thomas','J. Thomas','A. Scott','P. Reed','P. Reed','A. Rai','J. Spieth','S. Lowry','A. Noren','S. Lowry','S. Lowry','S. Lowry','J. Thomas','J. Thomas'],
+        ['B. James','R. Henley','R. Henley','R. Henley','R. Henley','J. Spieth','R. Henley','R. Henley','H. Matsuyama','R. Henley','R. Henley','R. Henley','B. Kohles','H. Matsuyama','H. Matsuyama','R. Henley','R. Henley','R. Henley','H. Matsuyama','J. Spieth','H. Matsuyama'],
+    ]
+
+    _insert_pool(db, tid, members, picks)
+    db.commit()
+    db.close()
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -1102,6 +1141,7 @@ init_db()
 seed_golfers()
 seed_pool_data()
 seed_pga_data()
+seed_usopen_data()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
