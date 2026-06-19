@@ -594,6 +594,37 @@ def seed_usopen_data():
     return True
 
 
+def ensure_usopen_ryan_o():
+    """Ryan O. was missing from the U.S. Open sheet but did play; add his entry.
+    Idempotent — safe to run on every startup (also patches the already-seeded
+    persistent DB where seed_usopen_data() short-circuits)."""
+    db = get_db()
+    t = db.execute("SELECT id FROM tournament WHERE name='U.S. Open' AND year=2026").fetchone()
+    if not t:
+        db.close()
+        return
+    tid = t['id']
+    if db.execute("SELECT id FROM pool_member WHERE tournament_id=? AND name='Ryan O.'",
+                  (tid,)).fetchone():
+        db.close()
+        return
+
+    db.execute("INSERT INTO pool_member (name, tournament_id) VALUES ('Ryan O.', ?)", (tid,))
+    mid = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+    ryan_picks = ['M. Fitzpatrick', 'T. Fleetwood', 'J. Rose', 'C. Gutterup', 'R. Henley', 'S. Lowry']
+    for order, golfer_name in enumerate(ryan_picks, start=1):
+        row = db.execute('SELECT id FROM golfer WHERE name = ?', (golfer_name,)).fetchone()
+        if row:
+            gid = row[0]
+        else:
+            db.execute('INSERT INTO golfer (name) VALUES (?)', (golfer_name,))
+            gid = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+        db.execute('INSERT INTO pick (pool_member_id, golfer_id, pick_order) VALUES (?, ?, ?)',
+                   (mid, gid, order))
+    db.commit()
+    db.close()
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -1142,6 +1173,7 @@ seed_golfers()
 seed_pool_data()
 seed_pga_data()
 seed_usopen_data()
+ensure_usopen_ryan_o()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
