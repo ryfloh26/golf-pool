@@ -175,6 +175,26 @@ def fetch_espn_scoreboard(espn_event_id=None):
         return _espn_cache.get('data')  # return stale cache if available
 
 
+_MONTHS = ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec')
+
+
+def _linescore_has_activity(ls):
+    """True if a round's linescore shows the player teed off or is scheduled to:
+    holes have been played, or a tee-time timestamp is present in its stats.
+    Used to tell made-the-cut players (who get a round-3 tee time) apart from
+    missed-cut players (placeholder round-3 entry, value 0 / '-' , no tee time).
+    """
+    if len(ls.get('linescores', [])) > 0:
+        return True
+    for cat in ls.get('statistics', {}).get('categories', []):
+        for st in cat.get('stats', []):
+            dv = st.get('displayValue', '')
+            if isinstance(dv, str) and any(m in dv for m in _MONTHS):
+                return True
+    return False
+
+
 def parse_espn_competitors(data):
     """Parse ESPN data into a dict of golfer_name -> {scores, status, position}."""
     if not data or 'events' not in data or not data['events']:
@@ -230,15 +250,21 @@ def parse_espn_competitors(data):
                 played_rounds += 1
 
         # Detect missed cut — only once the cut is actually in effect (round 3+
-        # or final). ESPN gives made-cut-but-not-teed-off players a placeholder
-        # R3/R4 linescore (value=0, display='-'); missed-cut players have ONLY
-        # R1 and R2 entries — no R3 placeholder at all.
-        status_detail = comp.get('status', {}).get('type', {}).get('description', '')
-        all_linescores = comp.get('linescores', [])
+        # or final). A player made the cut iff they have round-3 activity:
+        # holes played in round 3, or a scheduled (post-cut) round-3 tee time.
+        # Missed-cut players get a placeholder round-3 linescore (value 0,
+        # display '-') with no tee time. ESPN's per-competitor status is often
+        # null in this feed, so rely on the linescores rather than status.
+        status_detail = (comp.get('status', {}).get('type', {}).get('description') or '')
         if cut_in_effect:
+            made_cut = any(
+                ls.get('period', 0) >= 3 and _linescore_has_activity(ls)
+                for ls in comp.get('linescores', [])
+            )
             if 'cut' in status_detail.lower():
                 missed_cut = True
-            elif played_rounds == 2 and len(all_linescores) <= 2:
+            elif not made_cut and played_rounds >= 2:
+                # Played the first two rounds but never advanced to round 3.
                 missed_cut = True
 
         competitors[name] = {
