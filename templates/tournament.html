@@ -20,6 +20,25 @@
         --c-final-fg: #fff;
     }
 </style>
+{% elif tournament.name == 'The Open' %}
+<style>
+    /* The Open Championship: Claret Jug scheme — deep claret red + gold
+       on a dark navy/wine backdrop, matching the R&A / Open branding. */
+    :root {
+        --c-deep: #5a1a2b;
+        --c-navbar: #3f1220;
+        --c-primary: #7d2740;
+        --c-accent: #e8b923;
+        --c-accent-text: #3f1220;
+        --c-btn-hover-bg: #3f1220;
+        --c-btn-hover-text: #e8b923;
+        --c-round-bg: #7d2740;
+        --c-round-fg: #e8b923;
+        --c-total-bg: #f6e9d0;
+        --c-final-bg: #e8b923;
+        --c-final-fg: #3f1220;
+    }
+</style>
 {% endif %}
 <style>
     .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }

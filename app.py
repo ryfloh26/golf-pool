@@ -678,6 +678,50 @@ def ensure_usopen_ryan_o():
     db.close()
 
 
+def seed_open_data():
+    """Populate the database with the 2026 Open Championship pool (tournament id=4)."""
+    db = get_db()
+
+    # Skip if The Open 2026 already exists
+    existing = db.execute(
+        "SELECT id FROM tournament WHERE name='The Open' AND year=2026"
+    ).fetchone()
+    if existing:
+        db.close()
+        return False
+
+    # The Open 2026 runs July 16-19. ESPN's scoreboard ignores ?event= and
+    # returns the current tournament, so key it by its start date. The Open is
+    # events[0] on that date (the major sorts ahead of the concurrent Corales
+    # Puntacana event).
+    db.execute(
+        "INSERT INTO tournament (name, year, espn_event_id) VALUES ('The Open', 2026, '20260716')"
+    )
+    tid = db.execute('SELECT last_insert_rowid()').fetchone()[0]
+
+    # Order MUST match the picks rows below
+    members = ['Griffin', 'GG', 'Ray', 'Debbie', 'Ryan O.', 'Josh B.', 'Elice', 'Jill', 'Manny',
+               'George', 'Chris S.', 'Liz', 'Alton', 'Mike C.', 'Josh', 'Betty Anne', 'Jeff', 'Jake',
+               'Coach', 'Gary', 'Richard', 'Rob', 'Kenny', 'Karen']
+
+    # 6 pick rows, each entry = pick for member at that index. None = no pick.
+    # Names carry a few sheet typos (M. Kitzpatrick, R McIlroy, R. McIntyre, etc.)
+    # but all fuzzy-match to the correct ESPN competitor at scoring time.
+    picks = [
+        ['R. McIlroy', 'R. McIlroy', 'C. Young', 'S. Scheffler', 'R. McIlroy', 'S. Scheffler', 'R. McIlroy', 'M. Kitzpatrick', 'S. Scheffler', 'M. Kitzpatrick', 'M. Fitzpatrick', 'S. Scheffler', 'M. Fitzpatrick', 'S. Scheffler', 'R. McIlroy', 'M. Fitzpatrick', 'R. McIlroy', 'M. Fitzpatrick', 'M. Fitzpatrick', 'M. Fitzpatrick', 'R. McIlroy', 'R. McIlroy', 'M. Fitzpatrick', 'S. Scheffler'],
+        ['X. Schauffele', 'M. Fitzpatrick', 'T. Fleetwood', 'T. Fleetwood', 'M. Fiitzpatrick', 'R McIlroy', 'L. Aberg', 'S. Scheffler', 'W. Clark', 'R. McIlroy', 'R. McIlroy', 'T. Fleetwood', 'S. Scheffler', 'R. McIlroy', 'S. Scheffler', 'S. Scheffler', 'S. Scheffler', 'T. Fleetwood', 'T. Fleetwood', 'C. Morikawa', 'T. Fleetwood', 'M. Fitzpatrick', 'R. McIlroy', 'T. Fleetwood'],
+        ['V. Hovland', 'B. MacIntyre', 'C. Morikawa', 'C. Gotterup', 'V. Hovland', 'C. Gotterup', 'V. Hovland', 'C. Morikawa', 'S. Burns', 'R. MacIntyre', 'J. Rose', 'C. Gotterup', 'V. Hovland', 'S. Burns', 'T. Kim', 'C. Gotterup', 'S. Burns', 'J. Rose', 'C. Gotterup', 'W. Clark', 'J. Rose', 'C. Morikawa', 'V. Hovland', 'C. Morikawa'],
+        ['J. Rose', 'V. Hovland', 'M.W. Lee', 'C. Morikawa', 'J. Rose', 'C. Morikawa', 'J. Rose', 'M.W. Lee', 'C. Gotterup', 'C. Morikawa', 'C. Morikawa', 'R. MacIntyre', 'C. Morikawa', 'V. Hovland', 'C. Gotterup', 'J. Rose', 'C. Gotterup', 'R. McIntyre', 'T. Kim', 'C. Gotterup', 'R. McIntyre', 'C. Gotterup', 'C. Gotterup', 'R. MacIntyre'],
+        ['A. Scott', 'P. Reed', 'J. Spieth', 'J. Spieth', 'S.W. Kim', 'S.W. Kim', 'S. Lowry', 'J. Thomas', 'P. Reed', 'S. Lowry', 'J. Spieth', 'J. Spieth', 'P. Reed', 'S. Lowry', 'S. Lowry', 'J. Spieth', 'J. Spieth', 'T. Hatton', 'S. Lowry', 'P. Reed', 'S. Lowry', 'S. W. Kim', 'T. Hatton', 'R. Henley'],
+        ['E. Chacarra', 'S.W. Kim', 'R. Henley', 'J. Thomas', 'P. Reed', 'T. Hatton', 'B. Koepka', 'M. Thorbjornsen', 'J. Thomas', 'J. Thomas', 'R. Henley', 'T. Hatton', 'T. Hatton', 'J. Spieth', 'A. Rai', 'S. Lowry', 'T. Hatton', 'A. Fitzpatrick', 'R. Henley', 'S. Lowry', 'H. Matsuyama', 'S. Lowry', 'S. Lowry', 'J. Thomas'],
+    ]
+
+    _insert_pool(db, tid, members, picks)
+    db.commit()
+    db.close()
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -1227,6 +1271,7 @@ seed_pool_data()
 seed_pga_data()
 seed_usopen_data()
 ensure_usopen_ryan_o()
+seed_open_data()
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
